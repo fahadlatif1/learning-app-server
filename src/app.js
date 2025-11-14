@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import authRoutes from './routes/authRoutes.js';
 import challengeRoutes from './routes/challengeRoutes.js';
@@ -10,10 +12,16 @@ import lessonRoutes from './routes/lessonRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
 
 // CORS configuration
 const corsOptions = {
@@ -41,6 +49,9 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, '../public')));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -56,7 +67,15 @@ app.use('/api/challenges', challengeRoutes);
 app.use('/api/lessons', lessonRoutes);
 app.use('/api/users', userRoutes);
 
-// 404 handler
+// Serve index.html for all other routes (SPA fallback)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// 404 handler for API routes
 app.use(notFound);
 
 // Error handler (must be last)
